@@ -32,10 +32,15 @@ mutable struct GeodeState
     clay::Int
     obsidian::Int
     geode::Int
-    or_ignore::Bool
-    cl_ignore::Bool
-    ob_ignore::Bool
+    or_ignore::Bool # if could have built ore robot but instead did no building this time
+    cl_ignore::Bool # if could have built clay robot but did no building this time
+    ob_ignore::Bool # if could have built obsidian robot but did no building this time
     GeodeState() = new(1, 1, 0, 0, 0, 0, 0, 0, 0, false, false, false)
+end
+
+function maxpotential(s::GeodeState, maxminutes::Int)
+    mremaining = maxminutes - s.minute + 1
+    return s.geode + s.geode_robots * mremaining + (mremaining * (mremaining - 1)) ÷ 2
 end
 
 """ 
@@ -43,11 +48,15 @@ end
 
     Given a blueprint and a state, return a vector of possible successor states,
     since there may be more than one option possible to take given maxtime 
+    This is a depth-first search (DFS) for a maximum of geodes at time maxtime.
 """
-function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, verbose = false)
+function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, curmax, verbose = false)
     mremaining = maxtime - s.minute
     mremaining < 0 && return s
     cangeoderobot = s.ore >= b.geode_orecost && s.obsidian >= b.geode_obsidiancost
+    if curmax[begin] >= maxpotential(s, maxtime) # prune if cannot exceed current max
+        return s
+    end
     enough_or = s.ore_robots >= b.maxore_required
     enough_cr = s.clay_robots >= b.obsidian_claycost
     enough_ob = s.obsidian_robots >= b.geode_obsidiancost
@@ -84,12 +93,20 @@ function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, verbose = false)
         s.geode_robots += 1
         push!(newstates, s)
     else
+        while s.ore < min(b.orecost, b.claycost, b.obsidian_orecost, b.geode_orecost) &&
+           s.clay < b.obsidian_claycost && s.obsidian < b.geode_obsidiancost # cannot make any robot
+            s.minute += 1
+            s.ore += s.ore_robots
+            s.clay += s.clay_robots
+            s.obsidian += s.obsidian_robots
+            s.geode += s.geode_robots
+        end        
         # first case: do not build any robots
         s2 = deepcopy(s)
         canorerobot && (s2.or_ignore = true)
         canclayrobot && (s2.cl_ignore = true)
         canobsidianrobot && (s2.ob_ignore = true)       
-        push!(newstates, s2)  # this case is for no robots built   
+        push!(newstates, s2)  # this case is for no robots built
         if canobsidianrobot
             s2 = deepcopy(s)
             s2.ore -= b.obsidian_orecost
@@ -112,14 +129,19 @@ function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, verbose = false)
     end
     # recurse, return max state
     verbose && @show newstates
-    return sort!([forkstate(b, state, maxtime, verbose) for state in newstates], by = s -> s.geode)[end]
+    isempty(newstates) && return s
+    maxstate = sort!([forkstate(b, state, maxtime, curmax, verbose)
+       for state in newstates], by = gs -> gs.geode)[end]
+    curmax[begin] = max(maxstate.geode, curmax[begin]) # update current max outcome
+    return maxstate
 end
 
 """ part 1 sum the best geode processing outcomes time blueprint number for all blueprints """
 function part1(blueprints = blueprints, minutes = 24, verbose = true)
     qualitysum = 0
     for b in blueprints
-        best = forkstate(b, GeodeState(), minutes)
+        maxgeodes = [0]
+        best = forkstate(b, GeodeState(), minutes, maxgeodes)
         qualitysum += best.geode * b.num
         verbose && @show qualitysum, b, best
     end
@@ -130,7 +152,8 @@ end
 function part2(blueprints2 = blueprints[1:3], minutes = 32, verbose = true)
     geodeprod = 1
     for b in blueprints2
-        best = forkstate(b, GeodeState(), minutes)
+        maxgeode = [0]
+        best = forkstate(b, GeodeState(), minutes, maxgeode)
         geodeprod *= best.geode
         verbose && @show geodeprod, b, best
     end
