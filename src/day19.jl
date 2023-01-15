@@ -27,10 +27,9 @@ mutable struct GeodeState
     clay::UInt
     obsidian::UInt
     geode::Int
-    ob_deferred::Bool
     cl_deferred::Bool
-    or_deferred::Bool
-    GeodeState() = new(1, 1, 0, 0, 0, 0, 0, 0, 0, false, false, false)
+    ob_deferred::Bool
+    GeodeState() = new(1, 1, 0, 0, 0, 0, 0, 0, 0, false, false)
 end
 
 function maxore(b::Blueprint, s::GeodeState)
@@ -73,10 +72,10 @@ function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, curmax, mingeod)
     can_ob = s.ore >= b.obsidian_orecost && s.clay >= b.obsidian_claycost &&
        !enough_ob && !s.ob_deferred
     can_cl = s.ore >= b.claycost && !enough_cr && !s.cl_deferred && s.minute < maxtime - 1
-    can_or = s.ore >= b.orecost && !enough_or && !s.or_deferred
+    can_or = s.ore >= b.orecost && !enough_or
     newstates = GeodeState[]
     s.minute += 1
-    s.ob_deferred = s.cl_deferred = s.or_deferred = false
+    s.ob_deferred = s.cl_deferred = false
     mineresources!(s)
     if enough_or && enough_cr && enough_ob
         # if we are here, we can shortcut since production is steady state output.
@@ -113,7 +112,7 @@ function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, curmax, mingeod)
             s2.ore -= b.orecost
             s2.ore_robots += 1
             push!(newstates, s2)
-        elseif can_ob || can_cl
+        elseif b.claycost < b.orecost < b.obsidian_claycost
             s2 = deepcopy(s)
             can_ob && (s2.ob_deferred = true)
             can_cl && (s2.cl_deferred = true)
