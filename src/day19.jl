@@ -34,35 +34,10 @@ mutable struct GeodeState
 end
 
 function maxore(b::Blueprint, s::GeodeState)
-    if s.obsidian_robots >= b.geode_obsidiancost
-        if s.clay_robots >= b.obsidian_claycost
-            if s.ore_robots >= b.orecost
-                return b.geode_orecost
-            else
-                return max(b.orecost, b.geode_orecost)
-            end
-        else
-            if s.ore_robots >= b.orecost
-                return max(b.claycost, b.geode_orecost)
-            else
-                return max(b.orecost, b.claycost, b.geode_orecost)
-            end
-        end
-    else
-        if s.clay_robots >= b.obsidian_claycost
-            if s.ore_robots >= b.orecost
-                return max(b.geode_orecost, b.obsidian_orecost)
-            else
-                return max(b.orecost, b.obsidian_orecost, b.geode_orecost)
-            end
-        else
-            if s.ore_robots >= b.orecost
-                return max(b.claycost, b.obsidian_orecost, b.geode_orecost)
-            else
-                return max(b.orecost, b.claycost, b.obsidian_orecost, b.geode_orecost)
-            end
-        end
-    end
+    return max(b.geode_orecost, 
+              (s.obsidian_robots >= b.geode_obsidiancost ? 0 : b.obsidian_orecost),
+              (s.clay_robots >= b.obsidian_claycost ? 0 : b.claycost),
+              (s.ore_robots >= b.orecost ? 0 : b.orecost))
 end
 
 function mineresources!(s::GeodeState)
@@ -83,12 +58,15 @@ end
     since there may be more than one option possible to take given maxtime 
     This is a depth-first search (DFS) for a maximum of geodes at time maxtime.
 """
-function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, curmax)
+function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, curmax, mingeod)
     s.minute > maxtime && return s
     enough_or = s.ore_robots >= maxore(b, s)
     enough_cr = s.clay_robots >= b.obsidian_claycost
     enough_ob = s.obsidian_robots >= b.geode_obsidiancost
     if curmax[begin] >= maxpotential(s, maxtime) # prune if cannot exceed current max
+        return s
+    end
+    if s.geode == 0 && mingeod[begin] < s.minute
         return s
     end
     can_ge = s.ore >= b.geode_orecost && s.obsidian >= b.geode_obsidiancost
@@ -135,37 +113,39 @@ function forkstate(b::Blueprint, s::GeodeState, maxtime::Int, curmax)
             s2.ore -= b.orecost
             s2.ore_robots += 1
             push!(newstates, s2)
+        elseif can_ob || can_cl
+            s2 = deepcopy(s)
+            can_ob && (s2.ob_deferred = true)
+            can_cl && (s2.cl_deferred = true)
+            push!(newstates, s2)
         end
-        can_ob && (s.ob_deferred = true)
-        can_cl && (s.cl_deferred = true)
-        can_or && (s.or_deferred = true)
-        push!(newstates, s)
     else
         # cannot build any
         push!(newstates, s)
     end
-    # recurse, return max state
     isempty(newstates) && return s
-    maxstate = sort!([forkstate(b, state, maxtime, curmax)
+    # recurse, return max state
+    mingeod[begin] = min(mingeod[begin], [x.minute for x in newstates if x.geode > 0]...)
+    maxstate = sort!([forkstate(b, state, maxtime, curmax, mingeod)
        for state in newstates], by = gs -> gs.geode)[end]
-    curmax[begin] = max(maxstate.geode, curmax[begin]) # update current max outcome
+    curmax[begin] = max(curmax[begin], maxstate.geode)
     return maxstate
 end
 
 """ part 1 sum (best geode processing outcomes * blueprint number) for all blueprints """
 function part1(blueprints = blueprints, minutes = 24)
-    return sum(forkstate(b, GeodeState(), minutes, [0]).geode * b.num for b in blueprints)
+    return sum(forkstate(b, GeodeState(), minutes, [0], [minutes]).geode * b.num for b in blueprints)
 end
 
 @show part1()
 
 """ part 2 multiply the best geode processing outcomes in 32 minutes for only blueprints 1, 2, 3"""
 function part2(blueprints2 = blueprints[1:3], minutes = 32)
-    return prod(forkstate(b, GeodeState(), minutes, [0]).geode for b in blueprints2)
+    return prod(forkstate(b, GeodeState(), minutes, [0], [minutes]).geode for b in blueprints2)
 end
 
 @show part2()
 
-# [1834, 2240]
+# part = [1834, 2240]
 # 1834 [geode bests: 1 1 0 0 1 5 9 2 1 4 0 4 1 12 8 0 0 5 5 0 1 5 5 0 15 0 7 3 0 8]
 # 2240 = 16 * 20 * 7
