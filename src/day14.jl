@@ -17,7 +17,7 @@ for line in rockpathlines
 end
 
 function showcave(cav)
-    for row in 1:size(cav, 2)
+    for row in axes(cav, 2)
         println(String(cav[950:1050, row]))
     end
 end
