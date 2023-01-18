@@ -50,8 +50,7 @@ function pathmaking(; maxsteps = 10000, verbose = false)
     startpositions = [startpos, endpos, startpos]
     pathminutes = Int[]
     for i in eachindex(goals)
-        positions = [startpositions[i]]
-        g, goto_outerloop = goals[i], false
+        positions, g = [startpositions[i]], goals[i]
         verbose && @show positions, g
         for m in 1:maxsteps
             newpositions = empty(positions)
