@@ -3,7 +3,6 @@
 
 const part = [0, 0]
 const input = split(read("day22.txt", String), "\n\n")
-#const input = split(read("day22.txt", String), "\n\n")
 const btextlines, movetext = split(input[1], "\n"), input[2]
 const boardheight, boardwidth = length(btextlines), maximum(length(lin) for lin in btextlines)
 const board = fill(' ', boardheight, boardwidth)
