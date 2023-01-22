@@ -1,5 +1,8 @@
 """ advent of code 2022 day 16 """
 
+
+using Random
+
 const rate = Dict{String, Int}()
 const destvalves = Dict{String, Vector{String}}()
 for line in readlines("day16.txt")
@@ -7,12 +10,10 @@ for line in readlines("day16.txt")
     rate[valve] = parse(Int, ratetext)
     destvalves[valve] = [m.match for m in eachmatch(r"[A-Z][A-Z]", line[30:end])]
 end
-
-#=
-const valvecount = count(>(0), values(rate))
 const valvesum = sum(values(rate))
-@show valvecount valvesum  # 15 217
-=#
+opentotal(r) = (a = [x for x in reduce(vcat, r) if x isa Integer]; isempty(a) ? 0 : sum(a))
+
+
 
 """ measure pressure released in time series in part 1 """
 function pressure_released(steps, final = false)
